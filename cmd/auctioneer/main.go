@@ -216,12 +216,16 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 				fmt.Printf("\n\nSomething really bad happened! Couldnt read NEW BRAIN request: %v\n\n", err)
 				os.Exit(-1)
 			}
-			var newBrain auctionrunner.Brain
-			err = json.Unmarshal(data, &newBrain)
+			var newBrainData struct{
+				Name string `json:"name"`
+				Url string `json:"url"`
+			}
+			err = json.Unmarshal(data, &newBrainData)
 			if err != nil {
 				fmt.Printf("\n\nSomething really bad happened! Couldnt read unmarshall %s to NEW BRAIN: %v\n\n", string(data), err)
 				os.Exit(-1)
 			}
+			newBrain := auctionrunner.NewBrain(newBrainData.Name, newBrainData.Url)
 			brainChan <- newBrain
 			fmt.Printf("\n\n\nLETS A GO\n\n\n")
 		})
