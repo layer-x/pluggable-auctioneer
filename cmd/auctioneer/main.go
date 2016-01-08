@@ -34,6 +34,10 @@ import (
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
+	"github.com/codegangsta/martini"
+"net/http"
+"io/ioutil"
+"encoding/json"
 )
 
 var communicationTimeout = flag.Duration(
@@ -198,12 +202,42 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 		logger.Fatal("failed-to-construct-auction-runner-workpool", err, lager.Data{"num-workers": *auctionRunnerWorkers}) // should never happen
 	}
 
+	var brain auctionrunner.Brain
+	var ListenForBrain = func() {
+		fmt.Printf("\n\n\nILACKARMS\n\n\n")
+		brainChan := make(chan auctionrunner.Brain)
+		m := martini.Classic()
+		m.Post("/Start", func(req *http.Request) {
+			data, err := ioutil.ReadAll(req.Body)
+			if req.Body != nil {
+				defer req.Body.Close()
+			}
+			if err != nil {
+				fmt.Printf("\n\nSomething really bad happened! Couldnt read NEW BRAIN request: %v\n\n", err)
+				os.Exit(-1)
+			}
+			var newBrain auctionrunner.Brain
+			err = json.Unmarshal(data, &newBrain)
+			if err != nil {
+				fmt.Printf("\n\nSomething really bad happened! Couldnt read unmarshall %s to NEW BRAIN: %v\n\n", string(data), err)
+				os.Exit(-1)
+			}
+			brainChan <- newBrain
+			fmt.Printf("\n\n\nLETS A GO\n\n\n")
+		})
+		go m.Run()
+		brain = <- brainChan
+	}
+
+	ListenForBrain()
+
 	return auctionrunner.New(
 		delegate,
 		metricEmitter,
 		clock.NewClock(),
 		workPool,
 		logger,
+		brain,
 	)
 }
 
