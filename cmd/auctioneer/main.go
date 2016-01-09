@@ -202,10 +202,11 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 		logger.Fatal("failed-to-construct-auction-runner-workpool", err, lager.Data{"num-workers": *auctionRunnerWorkers}) // should never happen
 	}
 
-	var brain auctionrunner.Brain
+	brains := make(map[string]auctionrunner.Brain)
+	var defaultBrain auctionrunner.Brain
 	var ListenForBrain = func() {
 		fmt.Printf("\n\n\nILACKARMS\n\n\n")
-		brainChan := make(chan auctionrunner.Brain)
+		defaultBrainChan := make(chan auctionrunner.Brain)
 		m := martini.Classic()
 		m.Post("/Start", func(req *http.Request) {
 			data, err := ioutil.ReadAll(req.Body)
@@ -219,18 +220,28 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 			var newBrainData struct{
 				Name string `json:"name"`
 				Url string `json:"url"`
+				Tags string `json:"tags"`
 			}
 			err = json.Unmarshal(data, &newBrainData)
 			if err != nil {
 				fmt.Printf("\n\nSomething really bad happened! Couldnt read unmarshall %s to NEW BRAIN: %v\n\n", string(data), err)
 				os.Exit(-1)
 			}
-			newBrain := auctionrunner.NewBrain(newBrainData.Name, newBrainData.Url)
-			brainChan <- newBrain
-			fmt.Printf("\n\n\nLETS A GO\n\n\n")
+			newBrain := auctionrunner.NewBrain(newBrainData.Name, newBrainData.Url, newBrainData.Tags)
+			if strings.Contains(newBrainData.Tags, "default") {
+				if _, ok := brains["default"] ; !ok {
+					defaultBrainChan <- newBrain
+					fmt.Printf("\n\n\nLETS A GO\n\n\n")
+				}
+			}
+			tags := strings.Split(newBrainData.Tags, ",")
+			for _, tag := range tags {
+				brains[tag] = newBrain
+			}
 		})
 		go m.Run()
-		brain = <- brainChan
+		defaultBrain = <-defaultBrainChan
+		brains["default"] = defaultBrain
 	}
 
 	ListenForBrain()
@@ -241,7 +252,7 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 		clock.NewClock(),
 		workPool,
 		logger,
-		brain,
+		brains,
 	)
 }
 
