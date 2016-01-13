@@ -34,7 +34,6 @@ import (
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/http_server"
 	"github.com/tedsuo/ifrit/sigmon"
-	"github.com/codegangsta/martini"
 "net/http"
 "io/ioutil"
 "encoding/json"
@@ -207,8 +206,8 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 	var ListenForBrain = func() {
 		fmt.Printf("\n\n\nILACKARMS\n\n\n")
 		defaultBrainChan := make(chan auctionrunner.Brain)
-		m := martini.Classic()
-		m.Post("/Start", func(req *http.Request) {
+		m := http.NewServeMux()
+		m.HandleFunc("/Start", func(w http.ResponseWriter, req *http.Request) {
 			data, err := ioutil.ReadAll(req.Body)
 			if req.Body != nil {
 				defer req.Body.Close()
@@ -231,15 +230,16 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 			if strings.Contains(newBrainData.Tags, "default") {
 				if _, ok := brains["default"] ; !ok {
 					defaultBrainChan <- newBrain
-					fmt.Printf("\n\n\nLETS A GO\n\n\n")
+					fmt.Printf("\nLETS A GO\n")
 				}
 			}
 			tags := strings.Split(newBrainData.Tags, ",")
 			for _, tag := range tags {
+				fmt.Printf("\nAdding Brain: %s to task-type %s\n", newBrain.Name, tag)
 				brains[tag] = newBrain
 			}
 		})
-		go m.Run()
+		go http.ListenAndServe(":3000", m)
 		defaultBrain = <-defaultBrainChan
 		brains["default"] = defaultBrain
 	}
