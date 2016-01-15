@@ -41,27 +41,32 @@ type LRPStartRequest struct {
 	ProcessGuid string `json:"process_guid"`
 	Domain      string `json:"domain"`
 	Indices     []int  `json:"indices"`
-	EnvironmentVariables []*models.EnvironmentVariable `json:"environment_variables"`
+	Tags []string `json:"environment_variables"`
 	rep.Resource
 }
 
-func NewLRPStartRequest(processGuid, domain string, indices []int, res rep.Resource, env []*models.EnvironmentVariable) LRPStartRequest {
+func NewLRPStartRequest(processGuid, domain string, indices []int, res rep.Resource, tags []string) LRPStartRequest {
 	return LRPStartRequest{
 		ProcessGuid: processGuid,
 		Domain:      domain,
 		Indices:     indices,
 		Resource:    res,
-		EnvironmentVariables: env,
+		Tags: tags,
 	}
 }
 
 func NewLRPStartRequestFromModel(d *models.DesiredLRP, indices ...int) LRPStartRequest {
-	return NewLRPStartRequest(d.ProcessGuid, d.Domain, indices, rep.NewResource(d.MemoryMb, d.DiskMb, d.RootFs), d.EnvironmentVariables)
+	var tags []string
+	for _, envVar := range d.EnvironmentVariables {
+		if envVar.Name == "DIEGO_BRAIN_TAG" {
+			tags = strings.Split(envVar.Value, ",")
+		}
+	}
+	return NewLRPStartRequest(d.ProcessGuid, d.Domain, indices, rep.NewResource(d.MemoryMb, d.DiskMb, d.RootFs), tags)
 }
 
 func NewLRPStartRequestFromSchedulingInfo(s *models.DesiredLRPSchedulingInfo, indices ...int) LRPStartRequest {
-	emptyEnvironmentVariables := []*models.EnvironmentVariable{}
-	return NewLRPStartRequest(s.ProcessGuid, s.Domain, indices, rep.NewResource(s.MemoryMb, s.DiskMb, s.RootFs), emptyEnvironmentVariables)
+	return NewLRPStartRequest(s.ProcessGuid, s.Domain, indices, rep.NewResource(s.MemoryMb, s.DiskMb, s.RootFs), s.Tags)
 }
 
 func (lrpstart *LRPStartRequest) Validate() error {
