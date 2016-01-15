@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloudfoundry-incubator/bbs/models"
 	"github.com/cloudfoundry-incubator/rep"
+	"strings"
 )
 
 type TaskStartRequest struct {
@@ -16,7 +17,13 @@ func NewTaskStartRequest(task rep.Task) TaskStartRequest {
 }
 
 func NewTaskStartRequestFromModel(t *models.Task) TaskStartRequest {
-	return TaskStartRequest{rep.NewTask(t.TaskGuid, t.Domain, rep.NewResource(t.MemoryMb, t.DiskMb, t.RootFs))}
+	var tags []string
+	for _, envVar := range t.EnvironmentVariables {
+		if envVar.Name == "DIEGO_BRAIN_TAG" {
+			tags = strings.Split(envVar.Value, ",")
+		}
+	}
+	return TaskStartRequest{rep.NewTask(t.TaskGuid, t.Domain, rep.NewResource(t.MemoryMb, t.DiskMb, t.RootFs), tags...)}
 }
 
 func (t *TaskStartRequest) Validate() error {
@@ -34,24 +41,27 @@ type LRPStartRequest struct {
 	ProcessGuid string `json:"process_guid"`
 	Domain      string `json:"domain"`
 	Indices     []int  `json:"indices"`
+	EnvironmentVariables []*models.EnvironmentVariable `json:"environment_variables"`
 	rep.Resource
 }
 
-func NewLRPStartRequest(processGuid, domain string, indices []int, res rep.Resource) LRPStartRequest {
+func NewLRPStartRequest(processGuid, domain string, indices []int, res rep.Resource, env []*models.EnvironmentVariable) LRPStartRequest {
 	return LRPStartRequest{
 		ProcessGuid: processGuid,
 		Domain:      domain,
 		Indices:     indices,
 		Resource:    res,
+		EnvironmentVariables: env,
 	}
 }
 
 func NewLRPStartRequestFromModel(d *models.DesiredLRP, indices ...int) LRPStartRequest {
-	return NewLRPStartRequest(d.ProcessGuid, d.Domain, indices, rep.NewResource(d.MemoryMb, d.DiskMb, d.RootFs))
+	return NewLRPStartRequest(d.ProcessGuid, d.Domain, indices, rep.NewResource(d.MemoryMb, d.DiskMb, d.RootFs), d.EnvironmentVariables)
 }
 
 func NewLRPStartRequestFromSchedulingInfo(s *models.DesiredLRPSchedulingInfo, indices ...int) LRPStartRequest {
-	return NewLRPStartRequest(s.ProcessGuid, s.Domain, indices, rep.NewResource(s.MemoryMb, s.DiskMb, s.RootFs))
+	emptyEnvironmentVariables := []*models.EnvironmentVariable{}
+	return NewLRPStartRequest(s.ProcessGuid, s.Domain, indices, rep.NewResource(s.MemoryMb, s.DiskMb, s.RootFs), emptyEnvironmentVariables)
 }
 
 func (lrpstart *LRPStartRequest) Validate() error {
