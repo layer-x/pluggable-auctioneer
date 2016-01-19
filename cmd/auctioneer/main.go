@@ -207,6 +207,51 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 		fmt.Printf("\n\n\nILACKARMS\n\n\n")
 		defaultBrainChan := make(chan auctionrunner.Brain)
 		m := http.NewServeMux()
+		m.HandleFunc("/ShowBrains", func(w http.ResponseWriter, req *http.Request) {
+			brainString := "Brains: "
+			for _, brain := range brains {
+				data, _ := json.Marshal(brain)
+				var newBrainData struct{
+					Name string `json:"name"`
+					Url string `json:"url"`
+					Tags string `json:"tags"`
+				}
+				err = json.Unmarshal(data, &newBrainData)
+				if err != nil {
+					fmt.Fprintf(w,"\n\nSomething really bad happened! Couldnt read unmarshall %s to NEW BRAIN: %v\n\n", string(data), err)
+					return
+				}
+				brainString += fmt.Sprintf("\n-name: %s", newBrainData.Name)
+				brainString += fmt.Sprintf("\n url:  %s", newBrainData.Url)
+				brainString += fmt.Sprintf("\n tags: %s\n", newBrainData.Tags)
+			}
+			fmt.Fprintf(w, "\n%s", brainString)
+		})
+		m.HandleFunc("/DeleteBrains", func(w http.ResponseWriter, req *http.Request) {
+			for tag, _ := range brains {
+				if tag != "default" {
+					delete(brains, tag)
+				}
+			}
+			brainString := "Brains: "
+			for _, brain := range brains {
+				data, _ := json.Marshal(brain)
+				var newBrainData struct{
+					Name string `json:"name"`
+					Url string `json:"url"`
+					Tags string `json:"tags"`
+				}
+				err = json.Unmarshal(data, &newBrainData)
+				if err != nil {
+					fmt.Fprintf(w,"\n\nSomething really bad happened! Couldnt read unmarshall %s to NEW BRAIN: %v\n\n", string(data), err)
+					return
+				}
+				brainString += fmt.Sprintf("\n-name: %s", newBrainData.Name)
+				brainString += fmt.Sprintf("\n url:  %s", newBrainData.Url)
+				brainString += fmt.Sprintf("\n tags: %s\n", newBrainData.Tags)
+			}
+			fmt.Fprintf(w, "\n%s", brainString)
+		})
 		m.HandleFunc("/Start", func(w http.ResponseWriter, req *http.Request) {
 			data, err := ioutil.ReadAll(req.Body)
 			if req.Body != nil {
@@ -236,6 +281,7 @@ func initializeAuctionRunner(logger lager.Logger, cellStateTimeout time.Duration
 			tags := strings.Split(newBrainData.Tags, ",")
 			for _, tag := range tags {
 				fmt.Printf("\nAdding Brain: %s to task-type %s\n", newBrain.Name, tag)
+				fmt.Fprintf(w, "\nAdding Brain: %s to task-type %s\n", newBrain.Name, tag)
 				brains[tag] = newBrain
 			}
 		})
